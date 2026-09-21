@@ -10,7 +10,8 @@ ENV EMULATOR_ANDROID_VERSION=${EMULATOR_ANDROID_VERSION} \
     EMULATOR_API_LEVEL=${EMULATOR_API_LEVEL} \
     EMULATOR_SYS_IMG=x86_64 \
     EMULATOR_IMG_TYPE=google_apis \
-    EMULATOR_BROWSER=chrome
+    EMULATOR_BROWSER=chrome \
+    USER_BEHAVIOR_ANALYTICS=false
 ENV PATH=${PATH}:${ANDROID_HOME}/build-tools
 RUN yes | sdkmanager --licenses \
  && sdkmanager "platforms;android-${EMULATOR_API_LEVEL}" \
@@ -34,7 +35,9 @@ RUN yes | sdkmanager --licenses \
 RUN apt-get -qqy update && apt-get -qqy install --no-install-recommends \
     feh \
     libxcomposite-dev \
+    libpulse0 \
     openbox \
+    sudo \
     x11vnc \
     xterm \
  && apt autoremove -y \
@@ -76,6 +79,7 @@ ENV APP_PATH=${WORK_PATH}/${SCRIPT_PATH}
 RUN mkdir -p ${APP_PATH}
 COPY mixins ${APP_PATH}/mixins
 COPY cli ${APP_PATH}/cli
+RUN pip3 install --break-system-packages ${APP_PATH}/cli
 RUN --mount=type=secret,id=extension,dst=/tmp/extension.sh \
     bash /tmp/extension.sh
 RUN echo "${USERNAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
