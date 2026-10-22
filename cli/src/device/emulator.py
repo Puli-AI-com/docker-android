@@ -96,7 +96,10 @@ class Emulator(Device):
         if os.path.exists(self.path_emulator_config):
             self.logger.info("Config file exists")
             with open(self.path_emulator_config, 'r') as f:
-                if any(re.match(r'hw\.device\.name ?= ?{}'.format(self.device), line) for line in f):
+                # avdmanager names a Pixel device by its id (pixel_9), which is what config.ini holds;
+                # matching only the display name (Pixel 9) recreated and wiped the AVD on every start.
+                names = {self.device, self.device.lower().replace(" ", "_")}
+                if any(re.match(r'hw\.device\.name ?= ?(?:{})\s*$'.format("|".join(map(re.escape, names))), line) for line in f):
                     self.logger.info("Selected device is already created")
                     return True
                 else:
@@ -180,7 +183,8 @@ class Emulator(Device):
         self.logger.info(f"Deploying the {self.device_type}")
 
         basic_cmd = "emulator @{n}".format(n=self.name)
-        basic_args = "-gpu swiftshader_indirect -accel on -writable-system -verbose"
+        # Cold boot: a quick-boot snapshot saved in another container comes back with no network.
+        basic_args = "-gpu swiftshader_indirect -accel on -writable-system -verbose -no-snapshot-load -no-snapshot-save"
         wipe_arg = "-wipe-data" if not self.is_initialized() else ""
 
         start_cmd = f"{basic_cmd} {basic_args} {wipe_arg} {self.additional_args}"
@@ -203,7 +207,7 @@ class Emulator(Device):
                 try:
                     output = subprocess.check_output(
                         bash_command.split()).decode(UTF8)
-                    if expected_keyword in str(output).lower():
+                    if expected_keyword.lower() in str(output).lower():
                         if readiness_check_type is self.ReadinessCheck.POP_UP_WINDOW:
                             subprocess.check_call(adb_action, shell=True)
                         else:
@@ -243,8 +247,11 @@ class Emulator(Device):
             "ConversationListActivity"
         }
         key_enter_cmd = "adb shell input keyevent KEYCODE_ENTER"
+        # A boot that keeps the AVD's data (this image keeps Chrome 133 there) leaves System UI stuck in
+        # SurfaceComposer::getGpuContextPriority about 25 s after boot, every time, on the stock image too.
+        # Killing it once brings it back: watch for two minutes, not three checks right after boot.
         self.check_adb_command(self.ReadinessCheck.POP_UP_WINDOW, focus_cmd, pop_up_system_ui,
-                               max_attempt_pop_up, interval_pop_up, system_ui_cmd)
+                               24, 5, system_ui_cmd)
         for pe in pop_up_key_enter:
             self.check_adb_command(self.ReadinessCheck.POP_UP_WINDOW, focus_cmd, pe, max_attempt_pop_up,
                                    interval_pop_up, key_enter_cmd)
