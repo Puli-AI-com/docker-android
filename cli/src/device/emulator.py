@@ -239,6 +239,11 @@ class Emulator(Device):
 
         interval_pop_up = 0
         max_attempt_pop_up = 3
+        # A boot that keeps the AVD's data (this image keeps Chrome 133 there) leaves System UI stuck in
+        # SurfaceComposer::getGpuContextPriority about 25 s after boot, every time, on the stock image too.
+        # Killing it once brings it back: watch for about two minutes, not three checks right after boot.
+        interval_system_ui = 5
+        max_attempt_system_ui = 24
         pop_up_system_ui = "Not Responding: com.android.systemui"
         system_ui_cmd = f"adb shell su root 'kill $(pidof com.android.systemui)'"
         pop_up_key_enter = {
@@ -247,11 +252,8 @@ class Emulator(Device):
             "ConversationListActivity"
         }
         key_enter_cmd = "adb shell input keyevent KEYCODE_ENTER"
-        # A boot that keeps the AVD's data (this image keeps Chrome 133 there) leaves System UI stuck in
-        # SurfaceComposer::getGpuContextPriority about 25 s after boot, every time, on the stock image too.
-        # Killing it once brings it back: watch for two minutes, not three checks right after boot.
         self.check_adb_command(self.ReadinessCheck.POP_UP_WINDOW, focus_cmd, pop_up_system_ui,
-                               24, 5, system_ui_cmd)
+                               max_attempt_system_ui, interval_system_ui, system_ui_cmd)
         for pe in pop_up_key_enter:
             self.check_adb_command(self.ReadinessCheck.POP_UP_WINDOW, focus_cmd, pe, max_attempt_pop_up,
                                    interval_pop_up, key_enter_cmd)
